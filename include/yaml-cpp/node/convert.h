@@ -100,7 +100,7 @@ struct convert<_Null> {
         if (std::isnan(rhs)) {                                             \
           stream << ".nan";                                                \
         } else if (std::isinf(rhs)) {                                      \
-          if (std::signbit(rhs)) {                                         \
+          if (std::signbit(rhs)) {                                   \
             stream << "-.inf";                                             \
           } else {                                                         \
             stream << ".inf";                                              \
@@ -145,24 +145,73 @@ struct convert<_Null> {
     }                                                                      \
   }
 
+#define YAML_DEFINE_CONVERT_STREAMABLE_HACK(type, negative_op)                  \
+  template <>                                                              \
+  struct convert<type> {                                                   \
+    static Node encode(const type& rhs) {                                  \
+      std::stringstream stream;                                            \
+      stream.precision(std::numeric_limits<type>::max_digits10);           \
+      stream << rhs;                                                       \
+      return Node(stream.str());                                           \
+    }                                                                      \
+                                                                           \
+    static bool decode(const Node& node, type& rhs) {                      \
+      if (node.Type() != NodeType::Scalar) {                               \
+        return false;                                                      \
+      }                                                                    \
+      const std::string& input = node.Scalar();                            \
+      std::stringstream stream(input);                                     \
+      stream.unsetf(std::ios::dec);                                        \
+      if ((stream >> std::noskipws >> rhs) && (stream >> std::ws).eof()) { \
+        return true;                                                       \
+      }                                                                    \
+      if (std::numeric_limits<type>::has_infinity) {                       \
+        if (conversion::IsInfinity(input)) {                               \
+          rhs = std::numeric_limits<type>::infinity();                     \
+          return true;                                                     \
+        } else if (conversion::IsNegativeInfinity(input)) {                \
+          rhs = negative_op std::numeric_limits<type>::infinity();         \
+          return true;                                                     \
+        }                                                                  \
+      }                                                                    \
+                                                                           \
+      if (std::numeric_limits<type>::has_quiet_NaN) {                      \
+        if (conversion::IsNaN(input)) {                                    \
+          rhs = std::numeric_limits<type>::quiet_NaN();                    \
+          return true;                                                     \
+        }                                                                  \
+      }                                                                    \
+                                                                           \
+      return false;                                                        \
+    }                                                                      \
+  }
+
+
 #define YAML_DEFINE_CONVERT_STREAMABLE_SIGNED(type) \
   YAML_DEFINE_CONVERT_STREAMABLE(type, -)
 
 #define YAML_DEFINE_CONVERT_STREAMABLE_UNSIGNED(type) \
   YAML_DEFINE_CONVERT_STREAMABLE(type, +)
 
-YAML_DEFINE_CONVERT_STREAMABLE_SIGNED(int);
-YAML_DEFINE_CONVERT_STREAMABLE_SIGNED(short);
-YAML_DEFINE_CONVERT_STREAMABLE_SIGNED(long);
-YAML_DEFINE_CONVERT_STREAMABLE_SIGNED(long long);
-YAML_DEFINE_CONVERT_STREAMABLE_UNSIGNED(unsigned);
-YAML_DEFINE_CONVERT_STREAMABLE_UNSIGNED(unsigned short);
-YAML_DEFINE_CONVERT_STREAMABLE_UNSIGNED(unsigned long);
-YAML_DEFINE_CONVERT_STREAMABLE_UNSIGNED(unsigned long long);
 
-YAML_DEFINE_CONVERT_STREAMABLE_SIGNED(char);
-YAML_DEFINE_CONVERT_STREAMABLE_SIGNED(signed char);
-YAML_DEFINE_CONVERT_STREAMABLE_UNSIGNED(unsigned char);
+#define YAML_DEFINE_CONVERT_STREAMABLE_SIGNED_H(type) \
+  YAML_DEFINE_CONVERT_STREAMABLE_HACK(type, -)
+
+#define YAML_DEFINE_CONVERT_STREAMABLE_UNSIGNED_H(type) \
+  YAML_DEFINE_CONVERT_STREAMABLE_HACK(type, +)
+
+YAML_DEFINE_CONVERT_STREAMABLE_SIGNED_H(int);
+YAML_DEFINE_CONVERT_STREAMABLE_SIGNED_H(short);
+YAML_DEFINE_CONVERT_STREAMABLE_SIGNED_H(long);
+YAML_DEFINE_CONVERT_STREAMABLE_SIGNED_H(long long);
+YAML_DEFINE_CONVERT_STREAMABLE_UNSIGNED_H(unsigned);
+YAML_DEFINE_CONVERT_STREAMABLE_UNSIGNED_H(unsigned short);
+YAML_DEFINE_CONVERT_STREAMABLE_UNSIGNED_H(unsigned long);
+YAML_DEFINE_CONVERT_STREAMABLE_UNSIGNED_H(unsigned long long);
+
+YAML_DEFINE_CONVERT_STREAMABLE_SIGNED_H(char);
+YAML_DEFINE_CONVERT_STREAMABLE_SIGNED_H(signed char);
+YAML_DEFINE_CONVERT_STREAMABLE_UNSIGNED_H(unsigned char);
 
 YAML_DEFINE_CONVERT_STREAMABLE_SIGNED(float);
 YAML_DEFINE_CONVERT_STREAMABLE_SIGNED(double);
